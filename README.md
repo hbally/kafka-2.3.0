@@ -210,3 +210,47 @@ Apache Kafka is interested in building the community; we would welcome any thoug
 
 To contribute follow the instructions here:
  * https://kafka.apache.org/contributing.html
+
+
+#### 解析文章 ###
+
+- Kafka源码分析-网络层-1
+- Kafka源码分析-网络层-2
+- Kafka源码分析-网络层-3
+- Kafka源码分析-配置文件
+- Kafka源码分析-启动流程
+- Kafka基础组件和辅助类库简介
+- Kafka的Request和Response
+- Kafka初始化流程与请求处理
+- KafkaController分析1-选主和Failover
+- KafkaController分析2-NetworkClient分析
+- KafkaController分析3-ControllerChannelManager
+- KafkaController分析4-Partition选主
+- KafkaController分析5-Partition状态机
+- KafkaController分析6-Replica状态机
+- KafkaController分析7-启动流程
+- Kafka集群建立过程分析
+- Kafka集群Metadata管理
+- KafkaController分析8-broker挂掉
+- ReplicaManager源码解析1-相关基础类库
+- ReplicaManager源码解析2-LeaderAndIsr 请求响应
+- Kafka中的时间轮
+- DelayedOperationPurgatory--谜之炼狱
+- Kafka的日志管理模块--LogManager
+- Kafka中Message存储相关类大揭密
+- Kafka消息的磁盘存储
+- Kafka中的消息操作的层级调用关系
+- Kafka是如何处理客户端发送的数据的?
+- ISR列表是如何变化的?
+- Kafka的消息是如何被消费的?
+- Kafka的日志清理-LogCleane
+- Kafka运维填坑
+- Kafka重置消费的Offset
+- 记一次Kafka集群的故障恢复
+- 使用多数据中心部署来应对灾难恢复(一)
+- 使用多数据中心部署来应对灾难恢复(二)
+- 优化你的Apache Kafka部署
+
+链接：https://www.jianshu.com/p/aa274f8fe00f
+
+ 
