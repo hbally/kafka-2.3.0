@@ -53,6 +53,47 @@ import org.apache.kafka.common.{ClusterResource, Node}
 import scala.collection.JavaConverters._
 import scala.collection.{Map, Seq, mutable}
 
+/**
+  *
+  * kafka核心
+  * 组件简介
+  * KafkaScheduler
+  * 所在文件: core/src/main/scala/kafka/utils/KafkaScheduler.scala
+  * 功能: 接收需周期性执行的任务和延迟作务的添加, 使用一组thread pool来执行具体的任务;
+  * 实现: 封装了 java.util.concurrent.ScheduledThreadPoolExecutor;
+  * //
+  * ZkUtils
+  * 所在文件: core/scr/main/scala/kafka/utils/ZkUtils.scala
+  * 功能: 封装了可能用到的对zk上节点的创建,读,写,解析(主要是json)操作;
+  * 实现: 使用了一个小众的类库 I0Itec 来操作zk;
+  * //
+  * Pool
+  * 所在文件: core/src/main/scala/kafka/utils/Pool.scala
+  * 功能: 简单的并发对象池;
+  * 实现: 对ConcurrentHashMap的封裝;
+  * getAndMaybePut实现小技巧, 使用了double check技术, 在有值的情况下降低锁的开销;
+  * //
+  * Logging
+  * 所在文件: core/src/main/scala/kafka/utils/Logging.scala
+  * 功能: 定义了trait Logging 供其他类继承,方便写日志;
+  * 实现: 对org.apache.log4j.Logger的封装;
+  * //
+  * FileLock
+  * 所在文件: core/src/main/scala/kafka/utils/FileLock.scala
+  * 功能: 文件锁, 相当于linux的/usr/bin/lockf;
+  * 实现: 使用java.nio.channels.FileLock实现;
+  * //
+  * ByteBounderBlockingQueue
+  * 所在文件: core/src/main/scala/kafkak/utils/ByteBoundedBlockingQueue.scala;
+  * 功能: 阻塞队列, 队列满的衡量标准有两条: 队列内元素个数达到了上限, 队列内所有元素的size之各达到了上限;
+  * 实现: 使用java.util.concurrent.LinkedBlockingQueue实现, 加上了对队列内已有元素size大小的check;
+  * //
+  * DelayedItem
+  * 所在文件: core/src/main/scala/kafaka/utils/DelayedItem.scala
+  * 功能: 定义了可以放入到DelayQueue队列的对象;
+  * 实现: 实现了Delayed接口;
+  *
+  */
 object KafkaServer {
   // Copy the subset of properties that are relevant to Logs
   // I'm listing out individual properties here since the names are slightly different in each Config class...
