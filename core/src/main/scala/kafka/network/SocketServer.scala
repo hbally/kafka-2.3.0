@@ -869,6 +869,7 @@ private[kafka] class Processor(val id: Int,
     }
   }
 
+  //处理
   private def processCompletedReceives() {
     selector.completedReceives.asScala.foreach { receive =>
       try {

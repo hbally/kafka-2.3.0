@@ -292,6 +292,13 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
         // Create and start the socket server acceptor threads so that the bound port is known.
         // Delay starting processors until the end of the initialization sequence to ensure
         // that credentials have been loaded before processing authentications.
+        //SocketServer: 负责处理网络连接, 数据的接收和发送,
+        // 其中的RequestChannel负责向应用层转递请求,也负责把应用层的response传回网络层后发送出去;
+        //详细见:Kafka源码分析-网络层-1 Kafka源码分析-网络层-2 Kafka源码分析-网络层-3
+        //KafkaRequestHandlerPool: 线程池, 每个线程里跑一个KafkaRequestHandler
+        //KafkaRequestHandler: 循环调用RequestChannel::receiveRequest来poll到新的request交给KafkaApis处理;
+        //KafkaApis: 处理request的分发
+        //链接：https://www.jianshu.com/p/eccb310c64c6
         socketServer = new SocketServer(config, metrics, time, credentialProvider)
         socketServer.startup(startupProcessors = false)
 
@@ -310,6 +317,10 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
         tokenManager.startup()
 
         /* start kafka controller */
+        /*
+          选主和Failover
+          Topic的创始, Partition leader的选取, Partition的增加, PartitionReassigned, PreferredReplicaElection, Topic的删除等; 链接：https://www.jianshu.com/p/04f6bd37d2ef
+         */
         kafkaController = new KafkaController(config, zkClient, time, metrics, brokerInfo, brokerEpoch, tokenManager, threadNamePrefix)
         kafkaController.startup()
 
@@ -337,10 +348,12 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
             KafkaServer.MIN_INCREMENTAL_FETCH_SESSION_EVICTION_MS))
 
         /* start processing requests */
+        //处理消息分发KafkaApis
         dataPlaneRequestProcessor = new KafkaApis(socketServer.dataPlaneRequestChannel, replicaManager, adminManager, groupCoordinator, transactionCoordinator,
           kafkaController, zkClient, config.brokerId, config, metadataCache, metrics, authorizer, quotaManagers,
           fetchManager, brokerTopicStats, clusterId, time, tokenManager)
 
+        //真正处理消息KafkaRequestHandlerPool: 线程池, 每个线程里跑一个KafkaRequestHandler
         dataPlaneRequestHandlerPool = new KafkaRequestHandlerPool(config.brokerId, socketServer.dataPlaneRequestChannel, dataPlaneRequestProcessor, time,
           config.numIoThreads, s"${SocketServer.DataPlaneMetricPrefix}RequestHandlerAvgIdlePercent", SocketServer.DataPlaneThreadPrefix)
 

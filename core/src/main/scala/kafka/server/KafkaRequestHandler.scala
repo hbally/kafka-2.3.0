@@ -31,6 +31,7 @@ import scala.collection.mutable
 
 /**
  * A thread that answers kafka requests.
+  * 一个handler 一个线程处理kafka请求消息
  */
 class KafkaRequestHandler(id: Int,
                           brokerId: Int,
@@ -50,7 +51,7 @@ class KafkaRequestHandler(id: Int,
       // time_window is independent of the number of threads, each recorded idle
       // time should be discounted by # threads.
       val startSelectTime = time.nanoseconds
-
+      //不间断的拉取消息requestChannel.receiveRequest poll
       val req = requestChannel.receiveRequest(300)
       val endTime = time.nanoseconds
       val idleTime = endTime - startSelectTime
@@ -66,6 +67,7 @@ class KafkaRequestHandler(id: Int,
           try {
             request.requestDequeueTimeNanos = endTime
             trace(s"Kafka request handler $id on broker $brokerId handling request $request")
+            //分发消息处理各种类型的handler
             apis.handle(request)
           } catch {
             case e: FatalExitError =>
@@ -106,6 +108,7 @@ class KafkaRequestHandlerPool(val brokerId: Int,
 
   this.logIdent = "[" + logAndThreadNamePrefix + " Kafka Request Handler on Broker " + brokerId + "], "
   val runnables = new mutable.ArrayBuffer[KafkaRequestHandler](numThreads)
+  //创建处理消息的handler
   for (i <- 0 until numThreads) {
     createHandler(i)
   }
