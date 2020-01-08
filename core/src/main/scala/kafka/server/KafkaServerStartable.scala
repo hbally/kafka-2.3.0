@@ -29,12 +29,16 @@ object KafkaServerStartable {
   }
 }
 
+//伴生对象: object KafkaServerStartable 提供fromProps方法来创建 KafkaServerStartable;
+//KafkaServerStartable对象创建时会同时创建 KafkaServer, 这才是真正的主角;
 class KafkaServerStartable(val staticServerConfig: KafkaConfig, reporters: Seq[KafkaMetricsReporter]) extends Logging {
+  //主角KafkaServer
   private val server = new KafkaServer(staticServerConfig, kafkaMetricsReporters = reporters)
 
   def this(serverConfig: KafkaConfig) = this(serverConfig, Seq.empty)
 
   def startup() {
+    //启动
     try server.startup()
     catch {
       case _: Throwable =>

@@ -78,10 +78,12 @@ object Kafka extends Logging {
 
       // attach shutdown handler to catch terminating signals as well as normal termination
       Runtime.getRuntime().addShutdownHook(new Thread("kafka-shutdown-hook") {
-        override def run(): Unit = kafkaServerStartable.shutdown()
+        override def run(): Unit = kafkaServerStartable.shutdown() //捕获control-c中断,停止当前服务
       })
 
+      //启动服务-Kafka启动代理类:KafkaServerStartable
       kafkaServerStartable.startup()
+      //等待结束
       kafkaServerStartable.awaitShutdown()
     }
     catch {
