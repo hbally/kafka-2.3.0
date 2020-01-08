@@ -181,6 +181,7 @@ class KafkaController(val config: KafkaConfig,
         queuedEvent.awaitProcessing()
       }
     })
+    //启动选举
     eventManager.put(Startup)
     eventManager.start()
   }
@@ -1136,6 +1137,9 @@ class KafkaController(val config: KafkaConfig,
     }
   }
 
+  /**
+    * 首次触发,选举
+    */
   private def processStartup(): Unit = {
     zkClient.registerZNodeChangeHandlerAndCheckExistence(controllerChangeHandler)
     elect()
@@ -1554,6 +1558,7 @@ class KafkaController(val config: KafkaConfig,
   }
 
 
+  //状态机处理事件
   override def process(event: ControllerEvent): Unit = {
     try {
       event match {
