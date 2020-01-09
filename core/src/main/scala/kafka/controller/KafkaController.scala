@@ -167,8 +167,20 @@ class KafkaController(val config: KafkaConfig,
    * Invoked when the controller module of a Kafka server is started up. This does not assume that the current broker
    * is the controller. It merely registers the session expiration listener and starts the controller leader
    * elector
+    *
+    * 更新zk上的controller epoch信息;
+    * 注册zk上的broker/topic节点变化事件通知;
+    * 初始化ControllerContext, 主要是从zk上获取broker, topic, parition, isr, partition leader, replicas等信息;
+    * 启动ReplicaStateMachine;
+    * 启动PartitionStateMachine;
+    * 发送所有的partition信息(leader, isr, replica, epoch等)到所有的 live brokers;
+    * 如果允许自动leader rebalance的话, 则启动AutoRebalanceScheduler;
+    * 启动TopicDeletionManager;
+    *
+    *
    */
   def startup() = {
+    //注册zk的SessionExpiration事件通知
     zkClient.registerStateChangeHandler(new StateChangeHandler {
       override val name: String = StateChangeHandlers.ControllerHandler
       override def afterInitializingSession(): Unit = {
@@ -962,7 +974,7 @@ class KafkaController(val config: KafkaConfig,
     }
     finalLeaderIsrAndControllerEpoch
   }
-
+  //触发自动分区选举
   private def checkAndTriggerAutoLeaderRebalance(): Unit = {
     trace("Checking need to trigger auto leader balancing")
     val preferredReplicasForTopicsByBrokers: Map[Int, Map[TopicPartition, Seq[Int]]] =

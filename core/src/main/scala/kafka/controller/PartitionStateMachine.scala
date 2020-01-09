@@ -33,11 +33,15 @@ import scala.collection.mutable
 abstract class PartitionStateMachine(controllerContext: ControllerContext) extends Logging {
   /**
    * Invoked on successful controller election.
+    * 启动
    */
   def startup() {
     info("Initializing partition state")
+    //初始化已经存在的分区
     initializePartitionState()
     info("Triggering online partition state changes")
+    //分区选举：: 更新当前所有parititon的状态, 其中包括partition 选主, IRS的分配等操作,
+    // 将产生的LeaderAndIsrRequest, UpdateMetadataRequest通过ControllerBrokerRequestBatch 发送到各个broker node;
     triggerOnlinePartitionStateChange()
     debug(s"Started partition state machine with initial state -> ${controllerContext.partitionStates}")
   }
@@ -78,6 +82,7 @@ abstract class PartitionStateMachine(controllerContext: ControllerContext) exten
   /**
    * Invoked on startup of the partition's state machine to set the initial state for all existing partitions in
    * zookeeper
+    * 初始化已经存在的Partition的状态
    */
   private def initializePartitionState() {
     for (topicPartition <- controllerContext.allPartitions) {
@@ -118,6 +123,29 @@ abstract class PartitionStateMachine(controllerContext: ControllerContext) exten
  *                          Valid previous states are NewPartition/OfflinePartition
  * 4. OfflinePartition    : If, after successful leader election, the leader for partition dies, then the partition
  *                          moves to the OfflinePartition state. Valid previous states are NewPartition/OnlinePartition
+  *
+  *
+  * Kafka的每个Topic的存储在逻辑上分成若干个Partition,每个Partition又可以设置自己的副本Replica；
+  * 这样的设计就引出了几个概念:
+  * Partition: 消息在Kafka上存储的最小逻辑单元, 在物理上对应在不同的Broker机器上;
+  * Replica: 每个Partition可以设置自己的副本Partition, 这样主Partition叫作Leader, 副本叫作Replica；从灾备的角度考虑, 在物理上Replica尽量不要与Leader在同一台Broker物理机上;
+  * Ack: 客户端produce消息时, 可以设置Kafka服务端回应ack的策略:
+  * 3.1 不用回Ack, 客户端发送效率最高, 但无法确认是否真的发送成功;
+  * 3.2 仅Partition leader回ack, 发送效率次之, 可以确认Leader已经接收到消息;在这种情况下,如果leader挂了, 客户端将无法消费到这个消息;
+  * 3.3 所有Replica(实际上这不是真的)都需要回ack, 发送效率最差, Replica需要从Leader拉取消息;
+  * ISR: In Sync Replica, 是所有Replica的一个子集. Partition的replica可能很多, 针对上面的3.3,如果需要所有replicat都拉取到消息后再回ack,发送效率会很差,因此Kafka用了折衷的办法, 仅需要ISR中的replica接收了消息即可.ISR中的replica的消息应一直与leader同步;
+  * 既然有Leader的角色,又有多个replica, 就存在一个在选主的问题, 我们就来讲下多种情况下的选主策略;
+  *
+  *
+  * Partition有如下四种状态
+  *
+  * NonExistentPartition: 这个partition还没有被创建或者是创建后又被删除了;
+  * NewPartition: 这个parition已创建, replicas也已分配好,但leader/isr还未就绪;
+  * OnlinePartition: 这个partition的leader选好;
+  * OfflinePartition: 这个partition的leader挂了,这个parition状态为OfflinePartition;
+  * 状态转换图:
+  *
+  *
  */
 class ZkPartitionStateMachine(config: KafkaConfig,
                               stateChangeLogger: StateChangeLogger,
@@ -130,6 +158,7 @@ class ZkPartitionStateMachine(config: KafkaConfig,
   this.logIdent = s"[PartitionStateMachine controllerId=$controllerId] "
 
   /**
+    * 实现分区选举动作
     * Try to change the state of the given partitions to the given targetState, using the given
     * partitionLeaderElectionStrategyOpt if a leader election is required.
     * @param partitions The partitions
@@ -163,6 +192,8 @@ class ZkPartitionStateMachine(config: KafkaConfig,
   }
 
   /**
+    * 状态转换图:
+    *
    * This API exercises the partition's state machine. It ensures that every state transition happens from a legal
    * previous state to the target state. Valid state transitions are:
    * NonExistentPartition -> NewPartition:

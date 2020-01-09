@@ -28,6 +28,21 @@ import org.apache.zookeeper.KeeperException.Code
 
 import scala.collection.mutable
 
+/**
+  * Replica的状态
+  * Replica有7种状态:
+  *
+  * NewReplica: 在partition reassignment期间KafkaController创建New replica;
+  * OnlineReplica: 当一个replica变为一个parition的assingned replicas时, 其状态变为OnlineReplica, 即一个有效的OnlineReplica. Online状态的parition才能转变为leader或isr中的一员;
+  * OfflineReplica: 当一个broker down时, 上面的replica也随之die, 其状态转变为Onffline;
+  * ReplicaDeletionStarted: 当一个replica的删除操作开始时,其状态转变为ReplicaDeletionStarted;
+  * ReplicaDeletionSuccessful: Replica成功删除后,其状态转变为ReplicaDeletionSuccessful;
+  * ReplicaDeletionIneligible: Replica成功失败后,其状态转变为ReplicaDeletionIneligible;
+  * NonExistentReplica: Replica成功删除后, 从ReplicaDeletionSuccessful状态转变为NonExistentReplica状态.
+  * 状态转换图:
+  *
+  * @param controllerContext
+  */
 abstract class ReplicaStateMachine(controllerContext: ControllerContext) extends Logging {
   /**
    * Invoked on successful controller election.
