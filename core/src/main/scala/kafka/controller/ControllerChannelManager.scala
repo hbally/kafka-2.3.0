@@ -109,6 +109,7 @@ class ControllerChannelManager(controllerContext: ControllerContext,
     }
   }
 
+//  创建到单个broker node的连接
   private def addNewBroker(broker: Broker) {
     val messageQueue = new LinkedBlockingQueue[QueueItem]
     debug(s"Controller ${config.brokerId} trying to connect to broker ${broker.id}")
@@ -143,6 +144,7 @@ class ControllerChannelManager(controllerContext: ControllerContext,
         channelBuilder,
         logContext
       )
+      //使用NetworkClient连接到broker node, 使用selector处理网络IO;
       val networkClient = new NetworkClient(
         selector,
         new ManualMetadataUpdater(Seq(brokerNode).asJava),
@@ -170,6 +172,12 @@ class ControllerChannelManager(controllerContext: ControllerContext,
       RequestRateAndQueueTimeMetricName, TimeUnit.MILLISECONDS, TimeUnit.SECONDS, brokerMetricTags(broker.id)
     )
 
+    /**
+      * 发送线程RequestSendThread, 继承自ShutdownableThread,
+      * 需要发送的request会被add到val queue: BlockingQueue[QueueItem]中,
+      * 然后在doWork中被不断取出val QueueItem(apiKey, apiVersion, request, callback) = queue.take(),
+      * 再通过clientResponse = networkClient.blockingSendAndReceive(clientRequest, socketTimeoutMs)被发送直到clientResponse返回
+      */
     val requestThread = new RequestSendThread(config.brokerId, controllerContext, messageQueue, networkClient,
       brokerNode, config, time, requestRateAndQueueTimeMetrics, stateChangeLogger, threadName)
     requestThread.setDaemon(false)
@@ -253,6 +261,7 @@ class RequestSendThread(val controllerId: Int,
           else {
             val clientRequest = networkClient.newClientRequest(brokerNode.idString, requestBuilder,
               time.milliseconds(), true)
+            //处理请求给出响应
             clientResponse = NetworkClientUtils.sendAndReceive(networkClient, clientRequest, time)
             isSendSuccessful = true
           }
@@ -270,7 +279,7 @@ class RequestSendThread(val controllerId: Int,
         val api = requestHeader.apiKey
         if (api != ApiKeys.LEADER_AND_ISR && api != ApiKeys.STOP_REPLICA && api != ApiKeys.UPDATE_METADATA)
           throw new KafkaException(s"Unexpected apiKey received: $apiKey")
-
+        //给出响应
         val response = clientResponse.responseBody
 
         stateChangeLogger.withControllerEpoch(controllerContext.epoch).trace(s"Received response " +
@@ -315,7 +324,7 @@ class RequestSendThread(val controllerId: Int,
       false
   }
 }
-
+//批量处理实现
 class ControllerBrokerRequestBatch(config: KafkaConfig,
                                    controllerChannelManager: ControllerChannelManager,
                                    controllerEventManager: ControllerEventManager,
@@ -326,7 +335,7 @@ class ControllerBrokerRequestBatch(config: KafkaConfig,
   def sendEvent(event: ControllerEvent): Unit = {
     controllerEventManager.put(event)
   }
-
+  //实现批量发送请求
   def sendRequest(brokerId: Int,
                   request: AbstractControlRequest.Builder[_ <: AbstractControlRequest],
                   callback: AbstractResponse => Unit = null): Unit = {
@@ -336,7 +345,7 @@ class ControllerBrokerRequestBatch(config: KafkaConfig,
 }
 
 case class StopReplicaRequestInfo(replica: PartitionAndReplica, deletePartition: Boolean)
-
+//批量处理
 abstract class AbstractControllerBrokerRequestBatch(config: KafkaConfig,
                                                     controllerContext: ControllerContext,
                                                     stateChangeLogger: StateChangeLogger) extends  Logging {
@@ -348,6 +357,9 @@ abstract class AbstractControllerBrokerRequestBatch(config: KafkaConfig,
 
   def sendEvent(event: ControllerEvent): Unit
 
+  /*
+   批量发送请求
+   */
   def sendRequest(brokerId: Int,
                   request: AbstractControlRequest.Builder[_ <: AbstractControlRequest],
                   callback: AbstractResponse => Unit = null): Unit

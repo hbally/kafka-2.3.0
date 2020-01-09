@@ -71,6 +71,7 @@ class KafkaController(val config: KafkaConfig,
 
   private val stateChangeLogger = new StateChangeLogger(config.brokerId, inControllerContext = true, None)
   val controllerContext = new ControllerContext
+  //ControllerChannelManager 用来管理与其他所有的broker node的网络连接和请求发送等
   var controllerChannelManager = new ControllerChannelManager(controllerContext, config, time, metrics,
     stateChangeLogger, threadNamePrefix)
 
@@ -1206,6 +1207,7 @@ class KafkaController(val config: KafkaConfig,
     }
   }
 
+  //选举
   private def elect(): Unit = {
     activeControllerId = zkClient.getControllerId.getOrElse(-1)
     /*
