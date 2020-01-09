@@ -64,6 +64,9 @@ import java.util.stream.Collectors;
  * user-facing producer and consumer clients.
  * <p>
  * This class is not thread-safe!
+ * 用在何处:
+ * 1. kafka本身实现了java版的producer和consumer,里面的网络连接,请求发送均使用NetworkClient实现;
+ * 2. KafkaController中controller与其他broker的通讯,使用NetworkClient实现;
  */
 public class NetworkClient implements KafkaClient {
 
