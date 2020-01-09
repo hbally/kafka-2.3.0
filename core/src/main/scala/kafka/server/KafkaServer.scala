@@ -283,6 +283,12 @@ class KafkaServer(val config: KafkaConfig, time: Time = Time.SYSTEM, threadNameP
         logManager = LogManager(config, initialOfflineDirs, zkClient, brokerState, kafkaScheduler, time, brokerTopicStats, logDirFailureChannel)
         logManager.startup()
 
+        /**
+          * 对于集群中的每一个broker都保存着相同的完整的整个集群的metadata信息;
+          * metadata信息里包括了每个topic的所有partition的信息: leader, leader_epoch, controller_epoch, isr, replicas等;
+          * Kafka客户端从任一broker都可以获取到需要的metadata信息;
+          * 在每个Broker的KafkaServer对象中都会创建MetadataCache组件, 负责缓存所有的metadata信息;
+          */
         metadataCache = new MetadataCache(config.brokerId)
         // Enable delegation token cache for all SCRAM mechanisms to simplify dynamic update.
         // This keeps the cache up-to-date if new SCRAM mechanisms are enabled dynamically.

@@ -118,6 +118,10 @@ object LogReadResult {
                                            lastStableOffset = None)
 }
 
+/**
+  * 现在的Kafka增加了高可用的特性，即增加了复本的特性，同时必然会引入选主，同步等复杂性;
+  * ReplicaManager负责消息的写入，消费在多复本间同步, 节点成为主或从的转换等等相关的操作;
+  */
 object ReplicaManager {
   val HighWatermarkFilename = "replication-offset-checkpoint"
   val IsrChangePropagationBlackOut = 5000L
