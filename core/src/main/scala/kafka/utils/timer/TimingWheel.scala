@@ -95,6 +95,18 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * This class is not thread-safe. There should not be any add calls while advanceClock is executing.
  * It is caller's responsibility to enforce it. Simultaneous add calls are thread-safe.
+ *简言之，就是根据每个TimerTaskEntry的过期时间和当前时间轮的时间，
+ * 选择一个合适的bucket(实际上就是TimerTaskList),这个桶的超时时间相同(会去余留整),
+ * 把这个TimerTaskEntry对象放进去，如果当前的bucket因超时被DelayQueue队列poll出来的话,
+ * 以为着这个bucket里面的都过期, 会调用这个bucket的flush方法, 将里面的entry都再次add一次,
+ * 在这个add里因task已过期,将被立即提交执行,同时reset这个bucket的过期时间, 这样它就可以用来装入新的task了,
+   *
+    * 这个时间轮是支持层级的，就是如果当前放入的TimerTaskEntry的过期时间如果超出了当前层级时间轮的覆盖范围，
+  * 那么就创始一个overflowWheel: TimingWheel，放进去，只不过这个新的时间轮的降低了很多，
+  * 那的tick是老时间轮的interval(相当于老时间轮的tick * wheelSize),
+  * 基本可以类比成钟表的分针和时针;
+ *
+ *
  */
 @nonthreadsafe
 private[timer] class TimingWheel(tickMs: Long, wheelSize: Int, startMs: Long, taskCounter: AtomicInteger, queue: DelayQueue[TimerTaskList]) {

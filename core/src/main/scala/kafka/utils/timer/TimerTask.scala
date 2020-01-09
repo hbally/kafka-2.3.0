@@ -16,6 +16,9 @@
  */
 package kafka.utils.timer
 
+/**
+  * 时间轮里面的任务接口
+  */
 trait TimerTask extends Runnable {
 
   val delayMs: Long // timestamp in millisecond
@@ -29,6 +32,7 @@ trait TimerTask extends Runnable {
     }
   }
 
+  //每个TimerTask必须和一个TimerTaskEntry绑定，实现上放到时间轮里的是TimerTaskEntry
   private[timer] def setTimerTaskEntry(entry: TimerTaskEntry): Unit = {
     synchronized {
       // if this timerTask is already held by an existing timer task entry,

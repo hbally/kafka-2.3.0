@@ -30,6 +30,9 @@ private[timer] class TimerTaskList(taskCounter: AtomicInteger) extends Delayed {
   // TimerTaskList forms a doubly linked cyclic list using a dummy root entry
   // root.next points to the head
   // root.prev points to the tail
+  /**
+    * TimerTaskList这个双向列表 中的元素，因此有如下三个成员：
+    */
   private[this] val root = new TimerTaskEntry(null, -1)
   root.next = root
   root.prev = root
@@ -152,6 +155,7 @@ private[timer] class TimerTaskEntry(val timerTask: TimerTask, val expirationMs: 
     // If remove is called when another thread is moving the entry from a task entry list to another,
     // this may fail to remove the entry due to the change of value of list. Thus, we retry until the list becomes null.
     // In a rare case, this thread sees null and exits the loop, but the other thread insert the entry to another list later.
+    //如果这个TimerTask对象之前已经绑定到了一个 TimerTaskEntry上, 先调用timerTaskEntry.remove()解除绑定。
     while (currentList != null) {
       currentList.remove(this)
       currentList = list

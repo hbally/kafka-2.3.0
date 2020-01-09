@@ -23,6 +23,10 @@ import java.util.concurrent.locks.ReentrantReadWriteLock
 import kafka.utils.threadsafe
 import org.apache.kafka.common.utils.{KafkaThread, Time}
 
+/**
+  * 组装时间轮并使用
+  *
+  */
 trait Timer {
   /**
     * Add a new task to this executor. It will be executed after the task's delay
@@ -78,6 +82,7 @@ class SystemTimer(executorName: String,
   private[this] val readLock = readWriteLock.readLock()
   private[this] val writeLock = readWriteLock.writeLock()
 
+  //  * 因为TimingWhell本身不是线程安全，所以对其操作需要加锁：
   def add(timerTask: TimerTask): Unit = {
     readLock.lock()
     try {
