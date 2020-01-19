@@ -44,7 +44,17 @@ import scala.collection.mutable.ArrayBuffer
  * size or I/O rate.
  *
  * A background thread handles log retention by periodically truncating excess log segments.
- */
+  * 这里说的日志不是为了追踪程序运行而打的日志，指的是Kafka接受到消息后将消息写入磁盘或从磁盘读取的子系统;
+  * 它负责Log的创建，遍历，清理，读写等;
+  * LogManager统领所有的Log对象, 具体的读写操作还是要转给Log对象,Log对象又包含若干个LogSegment, 一层套一层,逐层分解;
+  * 它支持将本地的多个文件夹作出日志的存储目录;
+  *
+  * LogManager的创建：
+  * 在KafkaServer启动时创建，通过调用 `KafkaServer.createLogManager实现。
+  * 每个Topic都可以单独设置自己Log的过期时间，roll大小等，这些信息存储在zk上，因此集群管理员可以通过调整zk上的相应配置，在不重启整个集群的前提下，动态调整这些信息;
+  * LogManager的初始化:
+  *
+  **/
 @threadsafe
 class LogManager(logDirs: Seq[File],
                  initialOfflineDirs: Seq[File],
@@ -69,7 +79,7 @@ class LogManager(logDirs: Seq[File],
   val InitialTaskDelayMs = 30 * 1000
 
   private val logCreationOrDeletionLock = new Object
-  private val currentLogs = new Pool[TopicPartition, Log]()
+  private val currentLogs = new Pool[TopicPartition, Log]() //使用Pool管理所有的Log对象;
   // Future logs are put in the directory with "-future" suffix. Future log is created when user wants to move replica
   // from one log directory to another log directory on the same broker. The directory of the future log will be renamed
   // to replace the current log of the partition after the future log catches up with the current log
@@ -94,9 +104,11 @@ class LogManager(logDirs: Seq[File],
       _liveLogDirs.asScala.toBuffer
   }
 
+  //使用文件锁锁定目录
   private val dirLocks = lockLogDirs(liveLogDirs)
   @volatile private var recoveryPointCheckpoints = liveLogDirs.map(dir =>
     (dir, new OffsetCheckpointFile(new File(dir, RecoveryPointCheckpointFile), logDirFailureChannel))).toMap
+//  RecoveryPointCheckpointFile 文件(这个文件里记录的各个offset之前的数据均已落盘成功)的读取类对象;
   @volatile private var logStartOffsetCheckpoints = liveLogDirs.map(dir =>
     (dir, new OffsetCheckpointFile(new File(dir, LogStartOffsetCheckpointFile), logDirFailureChannel))).toMap
 
@@ -297,6 +309,12 @@ class LogManager(logDirs: Seq[File],
 
   /**
    * Recover and load all logs in the given data directories
+    * 恢复并且加载日志目录中的日志文件, 针对每个LogDir分别处理
+    * a. 如果kafka进程是优雅干净地退出的,会创建一个名为.kafka_cleanshutdown的文件作为标识;
+    * b. 启动kafka时, 如果不存在该文件, 则broker的状态进入到RecoveringFromUncleanShutdown
+    * c. 针对dir下的每个topic子目录, 创建Log对象, 此对象在创建过程中会加载,恢复实际的消息,
+    * 每个这样的过程跑在一个使用**CoreUtils.runnable **创建的Job里, job再提交到线程池执行, 实际上是生成一个Feture,
+    * d. 等待c中所有的job都执行完, 以便完成所有的log加载,恢复过程;
    */
   private def loadLogs(): Unit = {
     info("Loading logs.")
@@ -386,6 +404,12 @@ class LogManager(logDirs: Seq[File],
 
   /**
    *  Start the background threads to flush logs and do log cleanup
+    *  启动一个LogManager, 实际上是启动若干个定时任务:
+    *
+    * 我们来过一遍:
+    * a. checkpointRecoveryPointOffsets: 将每个Topic-Partition的recovery-point(这个值就是已经落盘的offset值,因为有些log可能还在pagecache里,没有落盘)写入到recovery-point文件;
+    * b. flushDirtyLogs: 针对每一个Log对象,如果flush时间到,就调用log->flush, 将pagecache中的消息落盘;
+    * c. cleanupLogs: 针对清除策略是删除而不是压缩的Log, 依照时间和文件大小作清理:
    */
   def startup() {
     /* Schedule the cleanup task to delete old logs */
