@@ -82,12 +82,14 @@ abstract class DelayedOperation(override val delayMs: Long,
   /**
    * Call-back to execute when a delayed operation gets expired and hence forced to complete.
    */
+//  超时后的回调处理;
   def onExpiration(): Unit
 
   /**
    * Process for completing an operation; This function needs to be defined
    * in subclasses and will be called exactly once in forceComplete()
    */
+  //操作完成后的回调处理;
   def onComplete(): Unit
 
   /**
@@ -97,6 +99,7 @@ abstract class DelayedOperation(override val delayMs: Long,
    *
    * This function needs to be defined in subclasses
    */
+  //在放入到Timer前, 先尝试着执行一下这个操作, 看是否可以完成, 如果可以就不用放到Timer里了, 这是为了确保任务都尽快完成作的一个优化;
   def tryComplete(): Boolean
 
   /**
@@ -162,6 +165,8 @@ object DelayedOperationPurgatory {
 
 /**
  * A helper purgatory class for bookkeeping delayed operations with a timeout, and expiring timed out operations.
+  * 实际上就是用来通过Timer和Watchers来管理一批延迟任务;
+  * timeoutTimer时间轮
  */
 final class DelayedOperationPurgatory[T <: DelayedOperation](purgatoryName: String,
                                                              timeoutTimer: Timer,
@@ -194,6 +199,7 @@ final class DelayedOperationPurgatory[T <: DelayedOperation](purgatoryName: Stri
   private[this] val estimatedTotalOperations = new AtomicInteger(0)
 
   /* background thread expiring operations that have timed out */
+  //重要的一个线程
   private val expirationReaper = new ExpiredOperationReaper()
 
   private val metricsTags = Map("delayedOperation" -> purgatoryName)
@@ -361,8 +367,10 @@ final class DelayedOperationPurgatory[T <: DelayedOperation](purgatoryName: Stri
 
   /**
    * A linked list of watched delayed operations based on some key
+    * 与某些事件关联在一起, 可以关联多个事件, 当这些事件中的某一个发生时, 这个任务即可认为是完成;这个就是 Watchers类要完成的工作;
    */
   private class Watchers(val key: Any) {
+    //用于存放和这个key关联的所有操作,一个key可以关联多个操作, 同时一个操作也可以被多个key关联(即位于多个Watchers对象中)
     private[this] val operations = new ConcurrentLinkedQueue[T]()
 
     // count the current number of watched operations. This is O(n), so use isEmpty() if possible
@@ -429,12 +437,14 @@ final class DelayedOperationPurgatory[T <: DelayedOperation](purgatoryName: Stri
     }
   }
 
+  //驱动时间轮
   def advanceClock(timeoutMs: Long) {
     timeoutTimer.advanceClock(timeoutMs)
 
     // Trigger a purge if the number of completed but still being watched operations is larger than
     // the purge threshold. That number is computed by the difference btw the estimated total number of
     // operations and the number of pending delayed operations.
+//    利用阈值(purgeInterval)来周期性地从Watchers中清理掉已经完成的任务;
     if (estimatedTotalOperations.get - delayed > purgeInterval) {
       // now set estimatedTotalOperations to delayed (the number of pending operations) since we are going to
       // clean up watchers. Note that, if more operations are completed during the clean up, we may end up with
@@ -456,6 +466,7 @@ final class DelayedOperationPurgatory[T <: DelayedOperation](purgatoryName: Stri
     false) {
 
     override def doWork() {
+      //驱动Timer向前走, pop出超时的延迟任务;
       advanceClock(200L)
     }
   }
